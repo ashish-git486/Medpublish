@@ -33,11 +33,19 @@ function productionFromRow(row) {
     productionStatus: row.production_status,
     productionEditorId: row.production_editor_id,
     copyeditorId: row.copyeditor_id,
+    typesetterId: row.typesetter_id,
     metadataVerified: row.metadata_verified,
     enteredProductionAt: row.entered_production_at,
     copyeditingCompletedAt: row.copyediting_completed_at,
     metadataVerifiedAt: row.metadata_verified_at,
     readyForTypesettingAt: row.ready_for_typesetting_at,
+    typesettingStartedAt: row.typesetting_started_at,
+    typesettingCompletedAt: row.typesetting_completed_at,
+    authorProofIssuedAt: row.author_proof_issued_at,
+    proofCorrectionsRequestedAt: row.proof_corrections_requested_at,
+    finalProofApprovedAt: row.final_proof_approved_at,
+    publicationReadyAt: row.publication_ready_at,
+    currentProofVersionId: row.current_proof_version_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     manuscript: row.manuscripts
@@ -117,7 +125,8 @@ async function attachProfileNames(records, idKeys) {
     const withNames = { ...record }
     for (const key of idKeys) {
       const nameKey = `${key.replace(/Id$/, '')}Name`
-      withNames[nameKey] = record[key] ? (byId.get(record[key])?.full_name ?? byId.get(record[key])?.email ?? null) : null
+      const profile = byId.get(record[key])
+      withNames[nameKey] = record[key] ? (profile?.full_name ?? profile?.email ?? null) : null
     }
     return withNames
   })
@@ -144,7 +153,7 @@ export async function getProductionQueue() {
 
   const withNames = await attachProfileNames(
     data.map(productionFromRow),
-    ['productionEditorId', 'copyeditorId'],
+    ['productionEditorId', 'copyeditorId', 'typesetterId'],
   )
   return { data: withNames, error: null }
 }
@@ -154,7 +163,18 @@ export async function getProductionStats() {
   const { data, error } = await getProductionQueue()
   if (error) {
     return {
-      data: { total: 0, accepted: 0, copyediting: 0, metadataVerification: 0, readyForTypesetting: 0 },
+      data: {
+        total: 0,
+        accepted: 0,
+        copyediting: 0,
+        metadataVerification: 0,
+        readyForTypesetting: 0,
+        typesetting: 0,
+        authorProof: 0,
+        proofCorrections: 0,
+        finalProofApproval: 0,
+        publicationReady: 0,
+      },
       error,
     }
   }
@@ -165,6 +185,11 @@ export async function getProductionStats() {
       copyediting: data.filter((p) => p.productionStatus === 'copyediting').length,
       metadataVerification: data.filter((p) => p.productionStatus === 'metadata_verification').length,
       readyForTypesetting: data.filter((p) => p.productionStatus === 'ready_for_typesetting').length,
+      typesetting: data.filter((p) => p.productionStatus === 'typesetting').length,
+      authorProof: data.filter((p) => p.productionStatus === 'author_proof').length,
+      proofCorrections: data.filter((p) => p.productionStatus === 'proof_corrections').length,
+      finalProofApproval: data.filter((p) => p.productionStatus === 'final_proof_approval').length,
+      publicationReady: data.filter((p) => p.productionStatus === 'publication_ready').length,
     },
     error: null,
   }
@@ -187,6 +212,7 @@ export async function getProductionRecord(manuscriptId) {
   const [withNames] = await attachProfileNames([productionFromRow(data)], [
     'productionEditorId',
     'copyeditorId',
+    'typesetterId',
   ])
 
   return {
@@ -297,4 +323,270 @@ export async function advanceProductionStatus(manuscriptId, newStatus) {
   })
 
   return { error }
+}
+
+// -------------------------------------------------------------------------
+// Phase 2: Typesetting, Author Proof, Corrections, Final Approval
+// -------------------------------------------------------------------------
+
+/**
+ * Start typesetting for a manuscript (ready_for_typesetting -> typesetting).
+ */
+export async function startTypesetting(manuscriptId, typesetterId) {
+  const { error } = await supabase.rpc('start_typesetting', {
+    p_manuscript_id: manuscriptId,
+    p_typesetter_id: typesetterId,
+  })
+
+  return { error }
+}
+
+/**
+ * Upload a new proof version for a manuscript.
+ */
+export async function uploadProofVersion(manuscriptId, proofData) {
+  const { error } = await supabase.rpc('upload_proof_version', {
+    p_manuscript_id: manuscriptId,
+    p_file_name: proofData.fileName,
+    p_file_type: proofData.fileType,
+    p_file_size_bytes: proofData.fileSizeBytes,
+    p_storage_path: proofData.storagePath,
+    p_file_hash: proofData.fileHash,
+    p_proof_purpose: proofData.proofPurpose,
+    p_notes: proofData.notes,
+  })
+
+  return { error }
+}
+
+/**
+ * Issue the current proof to the author for review (typesetting -> author_proof).
+ */
+export async function issueAuthorProof(manuscriptId) {
+  const { error } = await supabase.rpc('issue_author_proof', {
+    p_manuscript_id: manuscriptId,
+  })
+
+  return { error }
+}
+
+/**
+ * Submit proof correction requests (author_proof -> proof_corrections).
+ */
+export async function submitProofCorrections(manuscriptId, corrections) {
+  const { error } = await supabase.rpc('submit_proof_corrections', {
+    p_manuscript_id: manuscriptId,
+    p_corrections: JSON.stringify(corrections),
+  })
+
+  return { error }
+}
+
+/**
+ * Resolve a specific proof correction request.
+ */
+export async function resolveProofCorrection(correctionId, resolutionNote) {
+  const { error } = await supabase.rpc('resolve_proof_correction', {
+    p_correction_id: correctionId,
+    p_resolution_note: resolutionNote,
+  })
+
+  return { error }
+}
+
+/**
+ * Reject a specific proof correction request.
+ */
+export async function rejectProofCorrection(correctionId, resolutionNote) {
+  const { error } = await supabase.rpc('reject_proof_correction', {
+    p_correction_id: correctionId,
+    p_resolution_note: resolutionNote,
+  })
+
+  return { error }
+}
+
+/**
+ * Author approves the final proof (author_proof -> final_proof_approval).
+ */
+export async function approveFinalProof(manuscriptId) {
+  const { error } = await supabase.rpc('approve_final_proof', {
+    p_manuscript_id: manuscriptId,
+  })
+
+  return { error }
+}
+
+/**
+ * Mark manuscript as publication ready (final_proof_approval -> publication_ready).
+ */
+export async function markPublicationReady(manuscriptId) {
+  const { error } = await supabase.rpc('mark_publication_ready', {
+    p_manuscript_id: manuscriptId,
+  })
+
+  return { error }
+}
+
+/**
+ * Return to typesetting after corrections are resolved (proof_corrections -> typesetting).
+ */
+export async function returnToTypesetting(manuscriptId) {
+  const { error } = await supabase.rpc('return_to_typesetting', {
+    p_manuscript_id: manuscriptId,
+  })
+
+  return { error }
+}
+
+/**
+ * Get the current proof version for a manuscript.
+ */
+export async function getCurrentProofVersion(manuscriptId) {
+  const { data, error } = await supabase.rpc('get_current_proof_version', {
+    p_manuscript_id: manuscriptId,
+  })
+
+  return { data, error }
+}
+
+/**
+ * Get all correction requests for a manuscript.
+ */
+export async function getProofCorrections(manuscriptId) {
+  const { data, error } = await supabase.rpc('get_proof_corrections', {
+    p_manuscript_id: manuscriptId,
+  })
+
+  return { data, error }
+}
+
+/**
+ * Get proof version history for a manuscript.
+ */
+export async function getProofHistory(manuscriptId) {
+  const { data, error } = await supabase.rpc('get_proof_history', {
+    p_manuscript_id: manuscriptId,
+  })
+
+  return { data, error }
+}
+
+// -------------------------------------------------------------------------
+// Real Supabase Storage integration for proof files
+// -------------------------------------------------------------------------
+
+/**
+ * Upload a proof file to Supabase Storage and register it in the database.
+ * This follows the same pattern as uploadPublicationFile in publicationService.js.
+ */
+export async function uploadProofFile(manuscriptId, file, nextVersionNumber, notes = '') {
+  try {
+    // Validate file
+    if (!file) {
+      return { data: null, error: new Error('No file provided') }
+    }
+
+    if (file.size === 0) {
+      return { data: null, error: new Error('File is empty') }
+    }
+
+    // Validate file type (prefer PDF for proofs)
+    const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+    if (!allowedTypes.includes(file.type)) {
+      return { data: null, error: new Error('Only PDF and DOCX files are supported for proof uploads') }
+    }
+
+    // Generate storage path following the convention from migration 0012
+    const fileExtension = file.name.split('.').pop()
+    const storagePath = `${manuscriptId}/production/proofs/${nextVersionNumber}/proof.${fileExtension}`
+
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase
+      .storage
+      .from('publications')
+      .upload(storagePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      })
+
+    if (uploadError) {
+      return { data: null, error: uploadError }
+    }
+
+    // Calculate file hash (SHA-256) for duplicate detection
+    const fileBuffer = await file.arrayBuffer()
+    const hashBuffer = await crypto.subtle.digest('SHA-256', fileBuffer)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    const fileHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+
+    // Register proof version in database using the existing RPC
+    const { data, error } = await uploadProofVersion(manuscriptId, {
+      fileName: file.name,
+      fileType: file.type,
+      fileSizeBytes: file.size,
+      storagePath: storagePath,
+      fileHash: fileHash,
+      proofPurpose: 'typeset',
+      notes: notes,
+    })
+
+    if (error) {
+      // Clean up storage if database insert fails
+      await supabase.storage.from('publications').remove([storagePath])
+      return { data: null, error }
+    }
+
+    return { data, error: null }
+  } catch (error) {
+    return { data: null, error }
+  }
+}
+
+/**
+ * Get a signed URL for a proof file for authorized access.
+ * This provides time-limited access to private proof files.
+ */
+export async function getProofFileUrl(storagePath, expiresIn = 3600) {
+  try {
+    const { data, error } = await supabase
+      .storage
+      .from('publications')
+      .createSignedUrl(storagePath, expiresIn)
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    return { data: data.signedUrl, error: null }
+  } catch (error) {
+    return { data: null, error }
+  }
+}
+
+/**
+ * Validate a proof file before upload.
+ */
+export function validateProofFile(file) {
+  if (!file) {
+    return { valid: false, error: 'No file provided' }
+  }
+
+  if (file.size === 0) {
+    return { valid: false, error: 'File is empty' }
+  }
+
+  // Maximum file size: 50MB
+  const MAX_FILE_SIZE = 50 * 1024 * 1024
+  if (file.size > MAX_FILE_SIZE) {
+    return { valid: false, error: 'File size exceeds 50MB limit' }
+  }
+
+  // Allowed file types
+  const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+  if (!allowedTypes.includes(file.type)) {
+    return { valid: false, error: 'Only PDF and DOCX files are supported' }
+  }
+
+  return { valid: true, error: null }
 }

@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getCategoryBySlug } from '../data/mockData.js'
 import { statusBadgeClassName, statusLabel } from '../data/manuscriptStatus.js'
+import { productionStatusBadgeClassName, productionStatusLabel } from '../data/productionStatus.js'
 import { getMySubmissions } from '../services/manuscriptService.js'
+import { getProductionRecord, getCurrentProofVersion, getProofCorrections, getProofFileUrl } from '../services/productionService.js'
 
 function StatusBadge({ status }) {
   return (
@@ -10,6 +12,16 @@ function StatusBadge({ status }) {
       className={`inline-flex items-center rounded-full px-3 py-1 font-mono text-xs font-medium uppercase tracking-wide ${statusBadgeClassName(status)}`}
     >
       {statusLabel(status)}
+    </span>
+  )
+}
+
+function ProductionStatusBadge({ status }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-3 py-1 font-mono text-xs font-medium uppercase tracking-wide ${productionStatusBadgeClassName(status)}`}
+    >
+      {productionStatusLabel(status)}
     </span>
   )
 }
@@ -30,6 +42,122 @@ const STATUS_MESSAGES = {
   major_revision_requested: 'The editorial team has requested a major revision.',
   revision_submitted: 'Your revision has been submitted and is awaiting an editorial decision.',
   accepted: 'Accepted — preparing for publication.',
+}
+
+function ProductionInfo({ manuscriptId }) {
+  const [production, setProduction] = useState(null)
+  const [currentProof, setCurrentProof] = useState(null)
+  const [corrections, setCorrections] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [proofUrl, setProofUrl] = useState(null)
+  const [urlError, setUrlError] = useState(null)
+
+  useEffect(() => {
+    async function loadProductionData() {
+      setLoading(true)
+      const [productionResult, proofResult, correctionsResult] = await Promise.all([
+        getProductionRecord(manuscriptId),
+        getCurrentProofVersion(manuscriptId),
+        getProofCorrections(manuscriptId),
+      ])
+      setProduction(productionResult.data)
+      setCurrentProof(proofResult.data)
+      setCorrections(correctionsResult.data || [])
+      setLoading(false)
+    }
+    loadProductionData()
+  }, [manuscriptId])
+
+  useEffect(() => {
+    async function loadProofUrl() {
+      if (currentProof?.storage_path) {
+        const { data: url, error } = await getProofFileUrl(currentProof.storage_path)
+        if (error) {
+          setUrlError('Failed to load proof')
+        } else {
+          setProofUrl(url)
+        }
+      }
+    }
+    loadProofUrl()
+  }, [currentProof])
+
+  if (loading) {
+    return <p className="mt-3 text-sm text-slate-500">Loading production status…</p>
+  }
+
+  if (!production) {
+    return null
+  }
+
+  const openCorrections = corrections.filter(c => c.status === 'open').length
+
+  return (
+    <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <h4 className="font-mono text-xs uppercase tracking-wide text-slate-500">Production Status</h4>
+      <div className="mt-2 flex items-center gap-2">
+        <ProductionStatusBadge status={production.productionStatus} />
+      </div>
+
+      {currentProof && (
+        <div className="mt-3 text-sm">
+          <p className="font-medium text-ink">Current Proof: v{currentProof.version_number}</p>
+          <p className="text-xs text-slate-500">
+            {formatDate(currentProof.uploaded_at)} · {(currentProof.file_size_bytes / 1024 / 1024).toFixed(2)} MB
+          </p>
+          {proofUrl && (
+            <a
+              href={proofUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1 inline-block text-xs font-medium text-teal-700 hover:text-teal-800"
+            >
+              View/Download Proof →
+            </a>
+          )}
+          {urlError && (
+            <p className="mt-1 text-xs text-red-600">{urlError}</p>
+          )}
+        </div>
+      )}
+
+      {production.productionStatus === 'author_proof' && (
+        <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm">
+          <p className="font-medium text-blue-900">Action Required</p>
+          <p className="mt-1 text-blue-800">
+            Your article is ready for proof review. Please review the typeset proof and submit corrections or approve for publication.
+          </p>
+        </div>
+      )}
+
+      {production.productionStatus === 'proof_corrections' && (
+        <div className="mt-3 rounded-lg border border-orange-100 bg-orange-50 p-3 text-sm">
+          <p className="font-medium text-orange-900">Corrections Under Review</p>
+          <p className="mt-1 text-orange-800">
+            Your proof corrections are being reviewed by the production team.
+          </p>
+        </div>
+      )}
+
+      {production.productionStatus === 'final_proof_approval' && (
+        <div className="mt-3 rounded-lg border border-green-100 bg-green-50 p-3 text-sm">
+          <p className="font-medium text-green-900">Proof Approved</p>
+          <p className="mt-1 text-green-800">
+            Your final proof has been approved and is ready for publication.
+          </p>
+        </div>
+      )}
+
+      {production.productionStatus === 'publication_ready' && (
+        <div className="mt-3 rounded-lg border border-teal-100 bg-teal-50 p-3 text-sm">
+          <p className="font-medium text-teal-900">Publication Ready</p>
+          <p className="mt-1 text-teal-800">
+            Your article has completed the production workflow and is ready for publication.
+          </p>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function MySubmissionsPage() {
@@ -129,6 +257,10 @@ function MySubmissionsPage() {
                   )}
                   {STATUS_MESSAGES[submission.status] && (
                     <p className="text-sm text-slate-500">{STATUS_MESSAGES[submission.status]}</p>
+                  )}
+
+                  {submission.status === 'accepted' && (
+                    <ProductionInfo manuscriptId={submission.id} />
                   )}
 
                   {(submission.status === 'revision_requested' || submission.status === 'rejected') &&

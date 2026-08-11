@@ -12,6 +12,7 @@ const columns = [
   {
     title: 'For Authors',
     links: [
+      { label: 'Author Guidelines', to: '/author-guidelines' },
       { label: 'Submit Your Research', to: '/submit' },
       { label: 'Editorial Process', to: '/submit' },
       { label: 'Open Access Policy', to: '/submit' },

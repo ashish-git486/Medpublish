@@ -133,11 +133,21 @@ function ResourceDetailPage() {
         {typeof article.citationCount === 'number' && (
           <span>{article.citationCount} citations</span>
         )}
-        {article.isLocalSubmission && (
+        {article.sourceType === 'manuscript' && (
           <span className="text-teal-700">
             Published from a MedPublish author submission
           </span>
         )}
+        {article.sourceType === 'imported' && (
+          <span className="text-purple-700">
+            Imported article
+          </span>
+        )}
+        {article.journalName && <span>Journal: {article.journalName}</span>}
+        {article.volume && <span>Volume: {article.volume}</span>}
+        {article.issue && <span>Issue: {article.issue}</span>}
+        {article.pageRange && <span>Pages: {article.pageRange}</span>}
+        {article.publicationDate && <span>Published: {new Date(article.publicationDate).toLocaleDateString()}</span>}
       </div>
 
       <section className="mt-8">
@@ -157,6 +167,22 @@ function ResourceDetailPage() {
           <p className="mt-2 whitespace-pre-wrap text-base leading-relaxed text-slate-700">
             {article.content}
           </p>
+        </section>
+      )}
+
+      {article.publicationFile && (
+        <section className="mt-8">
+          <h2 className="font-mono text-xs uppercase tracking-wide text-slate-500">
+            Download Article
+          </h2>
+          <a
+            href={article.publicationFile}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-slate-50"
+          >
+            Download {article.fileName || 'Article File'}
+          </a>
         </section>
       )}
 

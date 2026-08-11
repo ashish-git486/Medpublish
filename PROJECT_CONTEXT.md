@@ -57,11 +57,9 @@ The platform also serves readers seeking access to high-quality, peer-reviewed m
 
 ## Current Status
 
-**Phase 7 complete: Production Workflow (first half).**
+**Phase 8 complete: Production Workflow (Phase 2 - Typesetting, Author Proof, Corrections, Final Approval).**
 
-An accepted manuscript now flows into a dedicated, editor/admin-only
-production pipeline, separate from the Editorial Dashboard and separate
-from peer review:
+The production workflow has been extended from "Ready For Typesetting" through the complete scholarly publishing lifecycle:
 
 ```
 manuscripts.status = 'accepted'   (unchanged — set by apply_editor_decision(), 0004)
@@ -77,73 +75,75 @@ accepted -> copyediting -> metadata_verification -> ready_for_typesetting
       |            |                |                 enter this stage)
       `- advance_production_status() enforces this exact forward-only
          sequence server-side; each transition logs a production_events row
+
+ready_for_typesetting -> typesetting -> author_proof -> proof_corrections
+                                            |              |
+                                            |              v
+                                            |        (corrections resolved)
+                                            |              |
+                                            v              v
+                                    final_proof_approval -> publication_ready
 ```
 
-This is deliberately the **first half only** of the production/publication
-pipeline. DOI registration, Crossref integration, volume/issue assignment,
-scheduled publication, and public Research Library publication are **not**
-implemented — those are future phases, and `manuscripts.status` never
-becomes anything beyond `accepted` as a result of this phase.
+This completes the production workflow with scholarly publishing best practices:
+- **Proof versioning** — immutable versioned proof files with historical preservation
+- **Author proof review** — authors can review proofs and submit corrections
+- **Proof correction workflow** — structured correction request and resolution system
+- **Final proof approval** — explicit author approval before publication
+- **Publication ready state** — distinct from "published" — indicates production completion
 
-- **New tables** (additive migration, `supabase/migrations/0005_production_workflow.sql`):
-  - `manuscript_production` — one row per manuscript (unique `manuscript_id`),
-    tracking `production_status`, `production_editor_id`, `copyeditor_id`,
-    `metadata_verified`, and a timestamp for each stage transition.
-  - `production_metadata` — the publication-facing record (title, running
-    title, abstract, keywords, author order, affiliations, corresponding
-    author). Explicitly **not** the scientific manuscript — editing it never
-    touches `manuscripts` or `manuscript_versions`. Editing it also resets
-    `metadata_verified` back to `false` server-side, since a prior
-    verification no longer applies to changed content.
-  - `production_events` — append-only production timeline, the same design
-    as `manuscript_events` (0004) but kept as a dedicated table since
-    production is editor/admin-only and shouldn't be mixed into the
-    author-facing timeline.
-- Four new `SECURITY DEFINER` database functions, all editor/admin-gated
-  server-side (never trusting the client's role claim):
-  - `assign_production_staff()` — sets/reassigns the production editor and
-    copyeditor.
-  - `update_production_metadata()` — edits the publication-facing metadata;
-    resets `metadata_verified`.
-  - `set_metadata_verified()` — toggles verification on/off; stamps
-    `metadata_verified_at`.
-  - `advance_production_status()` — the only way `production_status`
-    changes; rejects any transition that isn't the next step in the fixed
-    sequence, and refuses entry into `ready_for_typesetting` unless
-    metadata is already verified.
-- A new trigger, `create_production_record()`, fires after any update on
-  `manuscripts` that sets `status = 'accepted'`. It's idempotent (unique
-  constraint + `ON CONFLICT DO NOTHING`) and the migration backfills
-  production records for any manuscript that was already `accepted` before
-  this migration ran.
-- **`src/services/productionService.js`** (new) — the only module that
-  queries the three new tables: `getProductionQueue`, `getProductionStats`,
-  `getProductionRecord`, `getProductionMetadata`,
-  `getProductionStaffCandidates`, `getProductionTimeline`,
-  `assignProductionStaff`, `updateProductionMetadata`,
-  `setMetadataVerified`, `advanceProductionStatus`.
-- **`src/data/productionStatus.js`** (new) — shared label/badge/workflow-
-  order metadata, same pattern as `manuscriptStatus.js`/`editorDecisionStatus.js`.
-- **New route `/production`** (`ProductionDashboardPage.jsx`) — a
-  completely separate dashboard from `/admin`, editor/admin only, listing
-  every manuscript currently in production with status, assignees, and a
-  quick-advance action.
-- **New route `/production/:id`** (`ProductionDetailPage.jsx`) — the
-  central production workspace: current production status + advance
-  action, manuscript summary, staff assignment, the metadata editor +
-  verification toggle, the production timeline, and read-only panels for
-  version history, editorial decision history, and peer review history
-  (reusing `revisionService.js`/`reviewService.js` — no duplicated query
-  logic).
-- Navbar gains a "Production" link, visible to editor/admin only (same
-  pattern as the existing "Admin" link).
-- **Intentionally not built yet**: DOI/Crossref registration, volume/issue
-  assignment, scheduled publication, public Research Library publication,
-  and any notification system — all deferred to a future phase per the
-  original scope.
+- **New tables** (additive migration, `supabase/migrations/0012_production_workflow_phase2.sql`):
+  - `proof_versions` — immutable versioned proof files with version numbers, file metadata, and audit trail
+  - `proof_correction_requests` — author-submitted correction requests with status tracking (open/in_review/resolved/rejected)
+- **Extended tables**:
+  - `manuscript_production` — added new status values (typesetting, author_proof, proof_corrections, final_proof_approval, publication_ready), new timestamp columns, typesetter assignment, and current proof version reference
+  - `publication_files` — removed unique constraint to support multiple versions per publication, added file_purpose and proof_version_id columns
+- **New SECURITY DEFINER database functions**:
+  - `start_typesetting()` — transition from ready_for_typesetting to typesetting with typesetter assignment
+  - `upload_proof_version()` — upload new proof version with automatic version numbering
+  - `issue_author_proof()` — transition from typesetting to author_proof (requires proof to exist)
+  - `submit_proof_corrections()` — author submits correction requests (author_proof -> proof_corrections)
+  - `resolve_proof_correction()` — production staff resolves a correction request
+  - `reject_proof_correction()` — production staff rejects a correction request
+  - `approve_final_proof()` — author approves final proof (author_proof -> final_proof_approval)
+  - `mark_publication_ready()` — transition from final_proof_approval to publication_ready
+  - `return_to_typesetting()` — return to typesetting after corrections resolved (proof_corrections -> typesetting)
+  - `get_current_proof_version()` — retrieve current proof for author viewing
+  - `get_proof_corrections()` — retrieve correction requests for a manuscript
+  - `get_proof_history()` — retrieve all proof versions for a manuscript
+- **Extended RLS policies**:
+  - Authors can read their own production records (read-only)
+  - Authors can read their own proof versions
+  - Authors can read and submit their own correction requests
+  - Editors/admins retain full production control
+- **Extended service layer** (`src/services/productionService.js`):
+  - Added all new RPC function wrappers
+  - Extended stats to include new workflow stages
+  - Extended production record mapping to include new fields
+- **Extended data layer** (`src/data/productionStatus.js`):
+  - Added new status metadata and badges for all workflow stages
+  - Extended action labels and filter options
+  - Added new production event labels
+- **Extended UI components**:
+  - `TypesettingPanel` — typesetter assignment, proof upload, proof history, issue author proof
+  - `AuthorProofPanel` — proof viewing, correction submission, final approval
+  - `ProofCorrectionsPanel` — correction review and resolution, return to typesetting
+  - `PublicationReadyPanel` — publication checklist and final verification
+  - Enhanced `MySubmissionsPage` — authors can view production status and proof information for their accepted manuscripts
+  - Enhanced `ProductionDashboardPage` — displays typesetter assignment and new status counts
+- **Storage architecture**:
+  - Reuses existing `publications` storage bucket
+  - Uses deterministic path convention: `publications/{manuscript_id}/production/proofs/{version}/proof.pdf`
+  - Proof files protected by RLS (not publicly accessible until published)
+- **Intentionally not built yet**: DOI/Crossref registration, volume/issue assignment, scheduled publication, public Research Library publication from manuscripts, and any notification system — all deferred to a future phase per the original scope.
 
-See `SUPABASE_SETUP.md` for the full schema/RLS reference and the complete
-production-workflow testing checklist.
+See `SUPABASE_SETUP.md` for the full schema/RLS reference and the complete production-workflow testing checklist.
+
+---
+
+**Previous phase — Phase 7: Production Workflow (first half).**
+
+The post-acceptance production workflow existed for copyediting and metadata verification through "Ready For Typesetting", establishing the foundation for the complete production pipeline.
 
 ---
 
@@ -446,6 +446,28 @@ RLS: no policy for authors or reviewers at all (default-deny); editors/admins ca
 **public.production_events** — one row per production status change or staff assignment, logged automatically.
 Columns: id (PK), manuscript_id (references manuscripts), event_type (e.g. `entered_production`, `staff_assigned`, `copyediting_started`, `copyediting_completed`, `metadata_updated`, `metadata_verified`, `metadata_unverified`, `ready_for_typesetting`), production_status, actor_id (references auth.users), note, created_at.
 RLS: no policy for authors or reviewers at all (default-deny); editors/admins can read/insert. Kept as a dedicated table rather than merged into `manuscript_events` since production is an editor/admin-only workspace.
+
+**public.publications** — publication-level record for imported articles and future manuscript-produced articles.
+Columns: id (PK), source_type (`imported` | `manuscript`), manuscript_id (references manuscripts, nullable), title, abstract, authors, affiliations, corresponding_author_name, corresponding_author_email, keywords, article_type, category, doi, journal_name, volume, issue, page_range, publication_date, publication_status (`draft` default | `published`), published_at, published_by (references auth.users), created_by (references auth.users), created_at, updated_at, extracted_text, extraction_status, extraction_error, rejected_at, rejected_by (references auth.users).
+RLS: anonymous/authenticated users can read only `published` rows; editors/admins can read/insert/update all rows. Created by `create_imported_publication()` RPC; status changes only through `publish_publication()` and `reject_publication()` RPCs.
+
+**public.publication_files** — metadata for uploaded article files (PDF/DOCX); actual files stored in Supabase Storage.
+Columns: id (PK), publication_id (references publications, unique), file_name, file_type, file_size_bytes, storage_path (Supabase Storage path), file_hash (SHA-256), uploaded_by (references auth.users), uploaded_at.
+RLS: anonymous/authenticated users can read files only for `published` publications; editors/admins can read/insert/update all rows. Created by `upload_publication_file()` RPC with upsert support.
+
+**public.publication_events** — append-only audit trail for publication actions.
+Columns: id (PK), publication_id (references publications), event_type (`imported` | `metadata_updated` | `file_uploaded` | `published` | `unpublished`), actor_id (references auth.users), note, created_at.
+RLS: editors/admins can read/insert all rows. No client-facing INSERT/UPDATE/DELETE policy — rows created only by RPC functions.
+
+## Supabase Storage
+
+**Storage Bucket: `publications`** — stores uploaded article files (PDF/DOCX) for the publication import system.
+⚠️ **CRITICAL**: This bucket must be created manually in the Supabase dashboard (Storage → Buckets → Create new bucket → name: `publications` → Public). Storage buckets cannot be created via SQL migrations.
+File path structure: `{publication_id}/original.{extension}` (e.g., `abc-123-def/original.pdf`).
+Storage RLS policies (applied via migration 0011):
+- Public/authenticated users can read files (database RLS enforces only published publication files are accessible)
+- Only editors/admins can upload/delete files (enforced via `is_editor_or_admin()` check)
+See `SUPABASE_STORAGE_SETUP.md` for detailed setup instructions.
 
 **public.profiles.role** now also accepts `reviewer` (in addition to `author` | `editor` | `admin`). Granting it is done via the `set_user_role()` database function (editor/admin callers only), exposed in-app through the "Reviewer management" panel on `/admin`.
 

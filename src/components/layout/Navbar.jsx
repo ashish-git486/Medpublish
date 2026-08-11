@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext.jsx'
 const navLinks = [
   { to: '/', label: 'Home', end: true },
   { to: '/library', label: 'Library' },
+  { to: '/author-guidelines', label: 'Author Guidelines' },
   { to: '/submit', label: 'Submit' },
   { to: '/my-submissions', label: 'My Submissions' },
 ]
@@ -26,6 +27,7 @@ function Navbar() {
       ? [
           { to: '/admin', label: 'Admin' },
           { to: '/production', label: 'Production' },
+          { to: '/admin/library', label: 'Library' },
         ]
       : []),
   ]

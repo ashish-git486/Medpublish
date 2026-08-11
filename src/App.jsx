@@ -10,6 +10,9 @@ import LoginPage from './routes/LoginPage.jsx'
 import SignupPage from './routes/SignupPage.jsx'
 import AdminDashboardPage from './routes/AdminDashboardPage.jsx'
 import AdminSubmissionDetailPage from './routes/AdminSubmissionDetailPage.jsx'
+import AdminLibraryPage from './routes/AdminLibraryPage.jsx'
+import AdminImportPage from './routes/AdminImportPage.jsx'
+import AdminPublicationDetailPage from './routes/AdminPublicationDetailPage.jsx'
 import MySubmissionsPage from './routes/MySubmissionsPage.jsx'
 import SubmissionDetailPage from './routes/SubmissionDetailPage.jsx'
 import RevisionSubmitPage from './routes/RevisionSubmitPage.jsx'
@@ -17,6 +20,7 @@ import ReviewerDashboardPage from './routes/ReviewerDashboardPage.jsx'
 import ReviewFormPage from './routes/ReviewFormPage.jsx'
 import ProductionDashboardPage from './routes/ProductionDashboardPage.jsx'
 import ProductionDetailPage from './routes/ProductionDetailPage.jsx'
+import AuthorGuidelinesPage from './routes/AuthorGuidelinesPage.jsx'
 
 function App() {
   return (
@@ -25,6 +29,7 @@ function App() {
         <Route element={<PageLayout />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/library" element={<LibraryPage />} />
+          <Route path="/author-guidelines" element={<AuthorGuidelinesPage />} />
           <Route path="/resources/:id" element={<ResourceDetailPage />} />
           <Route
             path="/submit"
@@ -73,6 +78,30 @@ function App() {
             element={
               <ProtectedRoute requireRole={['editor', 'admin']}>
                 <AdminSubmissionDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/library"
+            element={
+              <ProtectedRoute requireRole={['editor', 'admin']}>
+                <AdminLibraryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/library/import"
+            element={
+              <ProtectedRoute requireRole={['editor', 'admin']}>
+                <AdminImportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/library/:id"
+            element={
+              <ProtectedRoute requireRole={['editor', 'admin']}>
+                <AdminPublicationDetailPage />
               </ProtectedRoute>
             }
           />

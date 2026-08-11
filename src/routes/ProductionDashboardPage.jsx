@@ -55,6 +55,11 @@ function ProductionDashboardPage() {
     copyediting: 0,
     metadataVerification: 0,
     readyForTypesetting: 0,
+    typesetting: 0,
+    authorProof: 0,
+    proofCorrections: 0,
+    finalProofApproval: 0,
+    publicationReady: 0,
   })
   const [activeFilter, setActiveFilter] = useState('all')
   const [loading, setLoading] = useState(true)
@@ -187,7 +192,7 @@ function ProductionDashboardPage() {
                       <p className="mt-1 text-sm text-slate-600">{record.manuscript?.authors}</p>
                       <p className="mt-1 text-xs text-slate-500">
                         Production editor: {record.productionEditorName || 'Unassigned'} · Copyeditor:{' '}
-                        {record.copyeditorName || 'Unassigned'}
+                        {record.copyeditorName || 'Unassigned'} · Typesetter: {record.typesetterName || 'Unassigned'}
                       </p>
                     </div>
 

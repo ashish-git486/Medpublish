@@ -21,6 +21,26 @@ export const PRODUCTION_STATUS_META = {
     label: 'Ready For Typesetting',
     badgeClassName: 'bg-teal-700 text-white',
   },
+  typesetting: {
+    label: 'Typesetting',
+    badgeClassName: 'bg-indigo-100 text-indigo-700',
+  },
+  author_proof: {
+    label: 'Author Proof',
+    badgeClassName: 'bg-purple-100 text-purple-700',
+  },
+  proof_corrections: {
+    label: 'Proof Corrections',
+    badgeClassName: 'bg-orange-100 text-orange-700',
+  },
+  final_proof_approval: {
+    label: 'Final Proof Approval',
+    badgeClassName: 'bg-pink-100 text-pink-700',
+  },
+  publication_ready: {
+    label: 'Publication Ready',
+    badgeClassName: 'bg-green-600 text-white',
+  },
 }
 
 // Fixed forward-only sequence enforced by advance_production_status() in
@@ -31,6 +51,10 @@ export const PRODUCTION_STATUS_ORDER = [
   'copyediting',
   'metadata_verification',
   'ready_for_typesetting',
+  'typesetting',
+  'author_proof',
+  'final_proof_approval',
+  'publication_ready',
 ]
 
 export function productionStatusLabel(status) {
@@ -54,6 +78,10 @@ export const ADVANCE_ACTION_LABEL = {
   accepted: 'Start Copyediting',
   copyediting: 'Complete Copyediting',
   metadata_verification: 'Mark Ready For Typesetting',
+  ready_for_typesetting: 'Start Typesetting',
+  typesetting: 'Issue Author Proof',
+  author_proof: 'Approve Final Proof',
+  final_proof_approval: 'Mark Publication Ready',
 }
 
 // Dashboard filter chips, in workflow order.
@@ -63,6 +91,11 @@ export const PRODUCTION_STATUS_FILTERS = [
   { key: 'copyediting', label: 'Copyediting' },
   { key: 'metadata_verification', label: 'Metadata Verification' },
   { key: 'ready_for_typesetting', label: 'Ready For Typesetting' },
+  { key: 'typesetting', label: 'Typesetting' },
+  { key: 'author_proof', label: 'Author Proof' },
+  { key: 'proof_corrections', label: 'Proof Corrections' },
+  { key: 'final_proof_approval', label: 'Final Proof Approval' },
+  { key: 'publication_ready', label: 'Publication Ready' },
 ]
 
 // production_events.event_type -> human-readable timeline label.
@@ -75,6 +108,13 @@ export const PRODUCTION_EVENT_LABELS = {
   metadata_verified: 'Metadata Verified',
   metadata_unverified: 'Metadata Verification Reset',
   ready_for_typesetting: 'Ready For Typesetting',
+  typesetting_started: 'Typesetting Started',
+  proof_created: 'Proof Version Created',
+  author_proof_issued: 'Author Proof Issued',
+  proof_corrections_requested: 'Proof Corrections Requested',
+  final_proof_approved: 'Final Proof Approved',
+  publication_ready: 'Publication Ready',
+  returned_to_typesetting: 'Returned to Typesetting',
 }
 
 export function productionEventLabel(eventType) {
