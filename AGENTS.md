@@ -49,6 +49,7 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 - Use `if not exists` / `create or replace` for idempotency
 - Keep migrations additive (don't drop tables/data)
 - Update PROJECT_CONTEXT.md when adding new tables
+- Latest migration: 0015_author_profile_enhancements.sql (author profile and workspace)
 
 ### Testing
 
@@ -106,11 +107,128 @@ medpublish/
 │   ├── services/      # API service layer (one per domain)
 │   └── utils/         # Utility functions
 ├── supabase/
-│   └── migrations/    # Database migrations (0011+)
+│   └── migrations/    # Database migrations (0014+)
 ├── AGENTS.md          # This file
 ├── PROJECT_CONTEXT.md # Project overview and status
 └── SUPABASE_STORAGE_SETUP.md # Storage setup guide
 ```
+
+## Authorship System (Phase 9)
+
+The structured authorship system provides real medical journal authorship capabilities:
+
+### Database Tables
+- `manuscript_authors` - Individual author records with ordering, roles, and invitation status
+- `manuscript_affiliations` - Reusable institutional affiliations
+- `manuscript_author_affiliations` - Many-to-many author-affiliation relationships
+- `author_contributions` - CRediT-style contribution types
+- `authorship_change_log` - Audit trail for authorship changes
+
+### Key Features
+- **Explicit author ordering** - No reliance on database insertion order
+- **Corresponding author enforcement** - Database constraint ensures exactly one corresponding author
+- **Co-author invitations** - Secure token-based invitation workflow
+- **Affiliation sharing** - Multiple authors can share the same institutional affiliation
+- **Contribution tracking** - CRediT taxonomy for standardized author role disclosure
+- **Change audit trail** - All authorship changes are logged for compliance
+
+### Service Functions
+Use `authorshipService.js` for all authorship operations:
+- `getManuscriptAuthors()` - Get authors with affiliations and contributions
+- `addManuscriptAuthor()` - Add new author with validation
+- `updateManuscriptAuthor()` - Update author information
+- `removeManuscriptAuthor()` - Remove author with audit logging
+- `inviteCoAuthor()` - Generate invitation token
+- `acceptCoAuthorInvitation()` - Accept co-author invitation
+- `setAuthorContributions()` - Set CRediT contribution types
+
+### Database Functions
+SECURITY DEFINER functions handle permission checks and constraints:
+- `add_manuscript_author()` - Server-side validation and constraint enforcement
+- `update_manuscript_author()` - Permission-based updates with change logging
+- `remove_manuscript_author()` - Secure removal with audit trail
+- `get_manuscript_authors()` - Retrieve complete authorship data
+- `invite_co_author()` - Generate secure invitation tokens
+- `accept_co_author_invitation()` - Handle invitation acceptance
+- `set_author_contributions()` - Update contribution types
+- `backfill_manuscript_authorship()` - Migrate existing manuscripts
+
+### RLS Policies
+- Submitting authors can manage authorship during draft/submitted/editorial_review stages
+- Editors/admins have full access for editorial control
+- Confirmed co-authors can read their own author records
+- All operations are protected by role-based access control
+
+### Backward Compatibility
+- Existing `manuscripts.authors` text field preserved
+- Existing `manuscripts.submitting_author_id` relationship maintained
+- Production workflow functions remain unchanged
+- Existing submission process works without modification
+
+## Author Profile & Author Workspace (Phase 10)
+
+The author profile and workspace system provides a professional control center for authors:
+
+### Extended Profile Fields
+- `phone` - Professional contact number
+- `country` - Country of residence or institution
+- `city` - City of residence or institution
+- `postal_address` - Full postal address for correspondence
+- `designation` - Professional title or position (e.g., Professor, MD, PhD)
+- `department` - Department or division within institution
+- `orcid` - ORCID iD for author identification (format: 0000-0000-0000-0000)
+- `bio` - Professional biography or research interests
+- `website_url` - Personal or institutional website
+
+### Key Features
+- **Profile completeness tracking** - Visual indicator showing completion percentage with missing field guidance
+- **Professional information management** - Structured fields for academic and professional identity
+- **ORCID integration** - Format validation and display with ORCID profile links
+- **Author manuscript workspace** - Unified view of manuscripts as submitting author or co-author
+- **Action required dashboard** - Priority-based display of revision requests, proof reviews, and invitations
+- **Publication tracking** - Dedicated section for published work with author roles
+- **Production status integration** - Real-time workflow status for accepted manuscripts
+- **Co-author invitation management** - Direct integration with invitation acceptance/decline
+
+### Service Functions
+Use `profileService.js` for all profile operations:
+- `getMyProfile()` - Get current user's profile
+- `updateMyProfile()` - Update current user's profile with validation
+- `getProfileCompleteness()` - Calculate profile completion percentage
+- `getAuthorManuscriptSummary()` - Get comprehensive manuscript summary
+- `getAuthorActionItems()` - Get pending action items (revisions, proofs, invitations)
+- `getMyPublications()` - Get published manuscripts where user is author
+- `validateORCID()` - Validate ORCID format
+- `validateWebsiteUrl()` - Validate website URL format
+
+### Database Functions
+SECURITY DEFINER functions handle profile operations:
+- `get_profile_completeness()` - Calculate completion percentage and identify missing fields
+- `get_author_manuscript_summary()` - Retrieve manuscripts where user is submitting author or co-author
+- `get_author_action_items()` - Aggregate action items requiring author attention
+
+### Route and UI
+- `/profile` - Author Profile page with comprehensive workspace
+- Profile header with avatar, professional information, and completeness indicator
+- Editable profile form with validation for professional information
+- Manuscript workspace with status-based filtering and role indicators
+- Action required section with priority-based action items
+- Publications section with author role and contribution display
+- Navbar integration with avatar and profile link
+
+### Security and RLS
+- Profile operations protected by existing `profiles` RLS policies
+- Users can only update their own profile information
+- Email field remains read-only (controlled by Supabase Auth)
+- Manuscript data access follows existing RLS policies from previous phases
+- Profile changes do not affect historical manuscript authorship data
+
+### Backward Compatibility
+- All new profile fields are optional and nullable
+- Existing profiles display gracefully with "Add" prompts
+- Existing manuscript workflow and submission process remain fully functional
+- Existing MySubmissionsPage continues to work as before
+- No changes to existing RLS policies or database constraints
 
 ## Domain Services
 
@@ -121,6 +239,9 @@ Each domain has a dedicated service that handles all database queries:
 - `productionService.js` - Production workflow (including proof versioning and corrections)
 - `publicationService.js` - Publication import system
 - `revisionService.js` - Revision submissions
+- `authorshipService.js` - Structured authorship management (authors, affiliations, contributions, invitations)
+- `profileService.js` - Author profile and workspace management (profile CRUD, completeness, manuscript summary, action items)
+- `userService.js` - User management and role grants
 
 **Never duplicate query logic across files.** Always use the appropriate service.
 
@@ -128,6 +249,8 @@ Each domain has a dedicated service that handles all database queries:
 
 - Phase 7: Production Workflow (first half) - Complete
 - Phase 8: Production Workflow (Phase 2 - Typesetting, Author Proof, Corrections, Final Approval) - Complete
+- Phase 9: Submission & Authorship Management Foundation - Complete
+- Phase 10: Author Profile & Author Workspace - Complete
 - Publication Import System - Complete (storage bucket setup required)
 
 See PROJECT_CONTEXT.md for detailed feature status.

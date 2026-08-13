@@ -112,3 +112,35 @@ export function IconNode(props) {
     </svg>
   )
 }
+
+export function IconPlus(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
+}
+
+export function IconTrash(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  )
+}
+
+export function IconArrowUp(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="m18 15-6-6-6 6" />
+    </svg>
+  )
+}
+
+export function IconArrowDown(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  )
+}

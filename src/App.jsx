@@ -21,6 +21,7 @@ import ReviewFormPage from './routes/ReviewFormPage.jsx'
 import ProductionDashboardPage from './routes/ProductionDashboardPage.jsx'
 import ProductionDetailPage from './routes/ProductionDetailPage.jsx'
 import AuthorGuidelinesPage from './routes/AuthorGuidelinesPage.jsx'
+import AuthorProfilePage from './routes/AuthorProfilePage.jsx'
 
 function App() {
   return (
@@ -60,6 +61,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <RevisionSubmitPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <AuthorProfilePage />
               </ProtectedRoute>
             }
           />

@@ -201,7 +201,7 @@ function SubmitResourcePage() {
       >
         <section className="space-y-5">
           <h2 className="font-mono text-xs uppercase tracking-wide text-teal-700">
-            Manuscript
+            Manuscript Information
           </h2>
 
           <div>

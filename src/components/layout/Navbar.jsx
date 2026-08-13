@@ -22,6 +22,7 @@ function Navbar() {
 
   const visibleNavLinks = [
     ...navLinks,
+    ...(isAuthenticated ? [{ to: '/profile', label: 'Profile' }] : []),
     ...(role === 'reviewer' ? [{ to: '/reviewer', label: 'Reviewer' }] : []),
     ...(role === 'editor' || role === 'admin'
       ? [
@@ -60,9 +61,27 @@ function Navbar() {
         <div className="flex items-center gap-4">
           {loading ? null : isAuthenticated ? (
             <>
-              <span className="hidden text-sm text-slate-500 sm:inline">
-                {profile?.full_name || profile?.email}
-              </span>
+              <NavLink 
+                to="/profile" 
+                className="flex items-center gap-2 text-sm text-slate-600 hover:text-teal-700 transition-colors"
+              >
+                {profile?.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt={profile.full_name}
+                    className="h-8 w-8 rounded-full object-cover border border-slate-200"
+                  />
+                ) : (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 border border-slate-200">
+                    <span className="text-xs font-semibold text-slate-500">
+                      {profile?.full_name?.charAt(0) || profile?.email?.charAt(0)}
+                    </span>
+                  </div>
+                )}
+                <span className="hidden sm:inline">
+                  {profile?.full_name || profile?.email}
+                </span>
+              </NavLink>
               <button
                 type="button"
                 onClick={handleLogout}

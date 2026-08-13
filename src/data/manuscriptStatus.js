@@ -4,6 +4,10 @@
 // colors for the same status value.
 
 export const STATUS_META = {
+  draft: {
+    label: 'Draft',
+    badgeClassName: 'bg-slate-100 text-slate-700',
+  },
   submitted: {
     label: 'Submitted',
     badgeClassName: 'bg-gold-500/10 text-gold-600',
@@ -73,4 +77,5 @@ export const DASHBOARD_STATUS_FILTERS = [
   { key: 'accepted', label: 'Accepted' },
   { key: 'published', label: 'Published' },
   { key: 'rejected', label: 'Rejected' },
+  { key: 'draft', label: 'Draft' },
 ]

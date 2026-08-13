@@ -57,7 +57,113 @@ The platform also serves readers seeking access to high-quality, peer-reviewed m
 
 ## Current Status
 
-**Phase 8 complete: Production Workflow (Phase 2 - Typesetting, Author Proof, Corrections, Final Approval).**
+**Phase 9 complete: Submission & Authorship Management Foundation.**
+
+The manuscript submission and authorship model has been significantly enhanced to support real medical journal requirements:
+
+- **Structured authorship system** — Multiple authors with explicit ordering, corresponding author designation, and affiliation management
+- **Co-author invitation workflow** — Secure token-based invitation system for co-authors with acceptance/decline tracking
+- **Author contributions tracking** — CRediT-style contribution statement support for standardized author role disclosure
+- **Affiliation management** — Reusable institutional affiliations that can be shared among authors
+- **Authorship change audit trail** — Complete history of authorship changes for compliance and transparency
+- **Draft submission support** — Extended manuscript status model to support draft submissions
+- **Backward compatibility** — Existing production workflow and submission process remain fully functional
+
+**New tables** (additive migration, `supabase/migrations/0014_manuscript_authorship_system.sql`):
+- `manuscript_authors` — Individual author records with explicit ordering, corresponding/submitting author flags, invitation status, and contribution statements
+- `manuscript_affiliations` — Reusable institutional affiliation records per manuscript
+- `manuscript_author_affiliations` — Many-to-many relationship between authors and affiliations
+- `author_contributions` — CRediT-style contribution types per author
+- `authorship_change_log` — Audit trail for authorship changes (added, removed, reordered, etc.)
+
+**Extended tables**:
+- `manuscripts` — added `draft` status to support draft submissions before final submission
+
+**New SECURITY DEFINER database functions**:
+- `add_manuscript_author()` — Add new author with validation and constraint enforcement
+- `update_manuscript_author()` — Update author information with permission checks
+- `remove_manuscript_author()` — Remove author with audit logging
+- `get_manuscript_authors()` — Retrieve all authors with affiliations and contributions
+- `invite_co_author()` — Generate secure invitation tokens for co-authors
+- `accept_co_author_invitation()` — Accept co-author invitation with profile association
+- `set_author_contributions()` — Set CRediT-style contribution types for authors
+- `backfill_manuscript_authorship()` — Migrate existing manuscripts to new authorship system
+
+**New service layer** (`src/services/authorshipService.js`):
+- Complete authorship management functions for authors, affiliations, contributions, and invitations
+- Validation functions for author order uniqueness and corresponding author requirements
+- Author confirmation status checking for submission requirements
+
+**Extended UI components**:
+- `SubmitResourcePage` — Preserved existing simple submission form for backward compatibility
+- Foundation for future multi-step submission UI with author management
+
+**Database constraints**:
+- Unique author order per manuscript
+- Single corresponding author enforcement
+- Invitation token security with expiration
+- RLS policies for authorship data protection
+- Authorship permissions based on manuscript status and user role
+
+---
+
+**Phase 10 complete: Author Profile & Author Workspace.**
+
+A comprehensive author profile and workspace system has been implemented to provide authors with a professional control center for managing their publishing identity and manuscript activities:
+
+- **Professional author profiles** — Extended profile fields for academic and professional information including ORCID, designation, department, biography, and contact details
+- **Profile completeness tracking** — Visual indicator showing profile completion percentage with guidance on missing information
+- **Author manuscript workspace** — Unified view of all manuscripts where the user is involved as submitting author or co-author
+- **Action required dashboard** — Prominent display of pending actions including revision requests, proof reviews, and co-author invitations
+- **Publication tracking** — Dedicated section for published work with author role and contribution information
+- **Production status integration** — Real-time production workflow status for accepted manuscripts
+- **Co-author invitation management** — Direct integration with the Phase 9 invitation system for accepting/declining invitations
+- **Security model** — Authors can only access and modify their own profile information; manuscript-specific data follows existing RLS policies
+
+**Extended profiles table** (additive migration, `supabase/migrations/0015_author_profile_enhancements.sql`):
+- Added professional fields: `phone`, `country`, `city`, `postal_address`, `designation`, `department`, `orcid`, `bio`, `website_url`
+- ORCID format validation constraint (basic format check: 0000-0000-0000-0000)
+- Website URL format validation constraint
+- Indexes for ORCID and country-based lookups
+
+**New SECURITY DEFINER database functions**:
+- `get_profile_completeness()` — Calculate profile completion percentage and identify missing fields
+- `get_author_manuscript_summary()` — Comprehensive summary of manuscripts where user is submitting author or co-author
+- `get_author_action_items()` — Aggregate action items requiring author attention (revisions, proofs, invitations)
+
+**New service layer** (`src/services/profileService.js`):
+- Profile CRUD operations with proper error handling
+- Profile completeness calculation and validation
+- Author manuscript summary retrieval
+- Action items aggregation
+- Co-author invitation management
+- Publication tracking for authors
+- ORCID and website URL validation utilities
+
+**New route and UI**:
+- `/profile` — Author Profile page with comprehensive workspace functionality
+- Profile header with avatar, professional information, and completeness indicator
+- Editable profile form with validation for professional information
+- Manuscript workspace with status-based filtering and role indicators
+- Action required section with priority-based action items
+- Publications section with author role and contribution display
+- Integration with existing Navbar for easy access
+
+**Security and RLS**:
+- Profile operations protected by existing `profiles` RLS policies (users can only update their own profile)
+- Manuscript data access follows existing RLS policies from previous phases
+- All new database functions use SECURITY DEFINER for proper permission checks
+- Email field remains read-only (controlled by Supabase Auth)
+- Profile changes do not affect historical manuscript authorship data
+
+**Backward compatibility**:
+- All new profile fields are optional and nullable
+- Existing profiles without new fields display gracefully with "Add" prompts
+- Existing manuscript workflow and submission process remain fully functional
+- Existing MySubmissionsPage continues to work as before
+- No changes to existing RLS policies or database constraints
+
+**Previous Phase 8 complete: Production Workflow (Phase 2 - Typesetting, Author Proof, Corrections, Final Approval).**
 
 The production workflow has been extended from "Ready For Typesetting" through the complete scholarly publishing lifecycle:
 
@@ -404,8 +510,8 @@ Columns: id (PK, references auth.users), full_name, email, avatar_url, role (`au
 RLS: readable by any authenticated user; insert/update restricted to your own row; a trigger prevents changing your own role unless you're already an editor/admin.
 
 **public.manuscripts** — manuscript submissions.
-Columns: id (PK), submitting_author_id (references auth.users), title, abstract, authors, category, article_type, content, keywords, institution, corresponding_email, references, status (`editorial_review` default | `submitted` | `revision_requested` | `under_peer_review` | `minor_revision_requested` | `major_revision_requested` | `revision_submitted` | `accepted` | `rejected` | `published`), screening_notes, reviewed_by (references auth.users), current_version_id (references manuscript_versions), submitted_at, reviewed_at, created_at, updated_at.
-RLS: authors can insert/read their own rows; editors/admins can read and update all rows (only they can change status/screening_notes — authors have no update policy at all); the public can read only `published` rows. `reviewed_by`/`reviewed_at` are set by a server-side trigger whenever status changes to a decision state, never trusted from the client. Content columns always mirror `current_version_id`'s snapshot — updated only via `submit_manuscript_revision()`.
+Columns: id (PK), submitting_author_id (references auth.users), title, abstract, authors, category, article_type, content, keywords, institution, corresponding_email, references, status (`draft` | `editorial_review` default | `submitted` | `revision_requested` | `under_peer_review` | `minor_revision_requested` | `major_revision_requested` | `revision_submitted` | `accepted` | `rejected` | `published`), screening_notes, reviewed_by (references auth.users), current_version_id (references manuscript_versions), submitted_at, reviewed_at, created_at, updated_at.
+RLS: authors can insert/read their own rows; editors/admins can read and update all rows (only they can change status/screening_notes — authors have no update policy at all); the public can read only `published` rows. `reviewed_by`/`reviewed_at` are set by a server-side trigger whenever status changes to a decision state, never trusted from the client. Content columns always mirror `current_version_id`'s snapshot — updated only via `submit_manuscript_revision()`. New `draft` status supports incomplete submissions before final submission.
 
 **public.review_assignments** — one row per (manuscript, reviewer) invitation.
 Columns: id (PK), manuscript_id (references manuscripts), reviewer_id (references auth.users), assigned_by (references auth.users, stamped server-side), assigned_at, accepted_at, declined_at, completed_at, status (`assigned` default | `accepted` | `declined` | `submitted` | `expired`), version_id (references manuscript_versions, auto-filled from the manuscript's current version at assignment time), created_at, updated_at.
@@ -459,6 +565,26 @@ RLS: anonymous/authenticated users can read files only for `published` publicati
 Columns: id (PK), publication_id (references publications), event_type (`imported` | `metadata_updated` | `file_uploaded` | `published` | `unpublished`), actor_id (references auth.users), note, created_at.
 RLS: editors/admins can read/insert all rows. No client-facing INSERT/UPDATE/DELETE policy — rows created only by RPC functions.
 
+**public.manuscript_authors** — individual author records for each manuscript with structured authorship information.
+Columns: id (PK), manuscript_id (references manuscripts), profile_id (references auth.users, nullable), first_name, middle_name, last_name, email, orcid, author_order (int, unique per manuscript), is_corresponding_author (boolean), is_submitting_author (boolean), invitation_status (`pending` | `invited` | `accepted` | `declined` | `revoked` | `confirmed`), invitation_token, invitation_sent_at, invitation_expires_at, responded_at, contribution_statement, created_at, updated_at.
+RLS: submitting authors can read/insert/update/delete their manuscript's authors during draft/submitted/editorial_review; editors/admins have full access; confirmed co-authors can read their own records. Constraints enforce unique author order and single corresponding author per manuscript.
+
+**public.manuscript_affiliations** — reusable institutional affiliation records per manuscript.
+Columns: id (PK), manuscript_id (references manuscripts), institution_name, department, division, city, state_province, country, postal_code, address, created_at, updated_at.
+RLS: submitting authors can read/insert/update their manuscript's affiliations during draft/submitted/editorial_review; editors/admins have full access.
+
+**public.manuscript_author_affiliations** — many-to-many relationship between authors and affiliations.
+Columns: id (PK), author_id (references manuscript_authors), affiliation_id (references manuscript_affiliations), created_at.
+RLS: submitting authors can read/insert their manuscript's author-affiliation relationships during draft/submitted/editorial_review; editors/admins have full access.
+
+**public.author_contributions** — CRediT-style contribution types per author.
+Columns: id (PK), author_id (references manuscript_authors), contribution_type (`conceptualization` | `methodology` | `investigation` | `data_curation` | `formal_analysis` | `software` | `validation` | `visualization` | `writing_original_draft` | `writing_review_editing` | `supervision` | `project_administration` | `funding_acquisition` | `resources` | `ethics_approval`), created_at.
+RLS: submitting authors can read/insert their manuscript's author contributions during draft/submitted/editorial_review; editors/admins have full access.
+
+**public.authorship_change_log** — audit trail for authorship changes after initial submission.
+Columns: id (PK), manuscript_id (references manuscripts), change_type (`author_added` | `author_removed` | `author_order_changed` | `corresponding_author_changed` | `affiliation_changed` | `invitation_sent` | `invitation_accepted` | `invitation_declined`), author_id (references manuscript_authors), previous_value (jsonb), new_value (jsonb), reason, changed_by (references auth.users), created_at.
+RLS: submitting authors can read change logs for their manuscripts; editors/admins can read all. INSERT restricted to system via SECURITY DEFINER functions.
+
 ## Supabase Storage
 
 **Storage Bucket: `publications`** — stores uploaded article files (PDF/DOCX) for the publication import system.
@@ -471,7 +597,7 @@ See `SUPABASE_STORAGE_SETUP.md` for detailed setup instructions.
 
 **public.profiles.role** now also accepts `reviewer` (in addition to `author` | `editor` | `admin`). Granting it is done via the `set_user_role()` database function (editor/admin callers only), exposed in-app through the "Reviewer management" panel on `/admin`.
 
-Full schema + RLS policy SQL lives in `supabase/migrations/0001_auth_and_manuscripts.sql` (base tables), `supabase/migrations/0002_editorial_screening.sql` (editorial screening additions), `supabase/migrations/0003_peer_review.sql` (peer review additions), `supabase/migrations/0004_revision_management.sql` (revision management additions), and `supabase/migrations/0005_production_workflow.sql` (production workflow additions — run all five, in order, manually in the Supabase SQL Editor for existing projects).
+Full schema + RLS policy SQL lives in `supabase/migrations/0001_auth_and_manuscripts.sql` (base tables), `supabase/migrations/0002_editorial_screening.sql` (editorial screening additions), `supabase/migrations/0003_peer_review.sql` (peer review additions), `supabase/migrations/0004_revision_management.sql` (revision management additions), `supabase/migrations/0005_production_workflow.sql` (production workflow additions), `supabase/migrations/0012_production_workflow_phase2.sql` (typesetting through publication_ready), `supabase/migrations/0013_proof_storage_security.sql` (storage security updates), `supabase/migrations/0014_manuscript_authorship_system.sql` (structured authorship system), and `supabase/migrations/0015_author_profile_enhancements.sql` (author profile and workspace — run all migrations, in order, manually in the Supabase SQL Editor for existing projects).
 
 ## Important Rules
 

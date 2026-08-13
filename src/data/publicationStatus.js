@@ -31,8 +31,11 @@ export function publicationStatusBadgeClassName(status) {
 
 /**
  * Order of publication statuses for sorting/filtering.
+ * Note: Only 'draft' and 'published' are actively used in the current workflow.
+ * 'rejected' exists for rejected publications but 'under_review' and 'approved' 
+ * are defined in migration 0008 but not actively used by RPC functions.
  */
-export const PUBLICATION_STATUS_ORDER = ['draft', 'under_review', 'approved', 'published', 'rejected']
+export const PUBLICATION_STATUS_ORDER = ['draft', 'published', 'rejected']
 
 /**
  * Filter options for admin dashboard publication list.
@@ -40,8 +43,6 @@ export const PUBLICATION_STATUS_ORDER = ['draft', 'under_review', 'approved', 'p
 export const PUBLICATION_STATUS_FILTERS = [
   { key: 'all', label: 'All' },
   { key: 'draft', label: 'Draft' },
-  { key: 'under_review', label: 'Under Review' },
-  { key: 'approved', label: 'Approved' },
   { key: 'published', label: 'Published' },
   { key: 'rejected', label: 'Rejected' },
 ]
