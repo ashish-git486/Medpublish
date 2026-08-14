@@ -347,10 +347,10 @@ export async function getMyPublications() {
   // Get manuscripts where user is submitting author and published
   const { data: submittingAuthorData, error: submittingError } = await supabase
     .from('manuscripts')
-    .select('id, title, category, article_type, published_at, updated_at')
+    .select('id, title, category, article_type, reviewed_at, updated_at')
     .eq('submitting_author_id', user.id)
     .eq('status', 'published')
-    .order('published_at', { ascending: false })
+    .order('reviewed_at', { ascending: false })
 
   if (submittingError) {
     console.error('MedPublish: failed to get my publications (submitting author)', submittingError)
@@ -364,13 +364,13 @@ export async function getMyPublications() {
       author_order,
       is_corresponding_author,
       manuscripts!inner (
-        id, title, category, article_type, published_at, updated_at
+        id, title, category, article_type, reviewed_at, updated_at
       )
     `)
     .eq('profile_id', user.id)
     .eq('invitation_status', 'accepted')
     .eq('manuscripts.status', 'published')
-    .order('manuscripts.published_at', { ascending: false })
+    .order('manuscripts.reviewed_at', { ascending: false })
 
   if (coAuthorError) {
     console.error('MedPublish: failed to get my publications (co-author)', coAuthorError)

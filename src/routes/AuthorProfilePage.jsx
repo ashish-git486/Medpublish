@@ -672,7 +672,7 @@ function Publications({ publications }) {
                     </span>
                   )}
                   <span>·</span>
-                  <span>{formatDate(publication.published_at)}</span>
+                  <span>{formatDate(publication.reviewed_at)}</span>
                 </div>
                 <h3 className="mt-1 font-serif text-base font-semibold text-ink">
                   {publication.title}
