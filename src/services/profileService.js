@@ -49,7 +49,8 @@ export async function updateMyProfile(profileData) {
 
   const { data, error } = await supabase
     .from('profiles')
-    .update({
+    .upsert({
+      id: user.id,
       full_name: profileData.fullName,
       phone: profileData.phone || null,
       country: profileData.country || null,
@@ -62,8 +63,9 @@ export async function updateMyProfile(profileData) {
       bio: profileData.bio || null,
       website_url: profileData.websiteUrl || null,
       avatar_url: profileData.avatarUrl || null,
+    }, {
+      onConflict: 'id'
     })
-    .eq('id', user.id)
 
   if (error) {
     console.error('MedPublish: failed to update profile', error)
