@@ -29,7 +29,7 @@ function formatDate(isoDate) {
 // PROFILE HEADER COMPONENT
 // =========================================================================
 
-function ProfileHeader({ profile, completeness }) {
+function ProfileHeader({ profile, completeness, onEdit }) {
   return (
     <div className="mb-8 rounded-xl border border-slate-200 bg-white p-6">
       <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
@@ -102,7 +102,7 @@ function ProfileHeader({ profile, completeness }) {
 
         {/* Edit Button */}
         <button
-          onClick={() => document.getElementById('edit-profile-section').scrollIntoView({ behavior: 'smooth' })}
+          onClick={onEdit}
           className="flex-shrink-0 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
         >
           Edit Profile
@@ -187,7 +187,7 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
   }
 
   return (
-    <div id="edit-profile-section" className="mb-8 rounded-xl border border-slate-200 bg-white p-6">
+    <div className="mb-8 rounded-xl border border-slate-200 bg-white p-6">
       <h2 className="font-serif text-xl font-semibold text-ink mb-6">Edit Profile</h2>
       
       {errors.submit && (
@@ -806,8 +806,12 @@ function AuthorProfilePage() {
 
   const handleProfileSave = () => {
     setEditMode(false)
-    // Reload data
+    // Reload the page to refresh data
     window.location.reload()
+  }
+
+  const handleProfileCancel = () => {
+    setEditMode(false)
   }
 
   const handleAcceptInvitation = async (authorId) => {
@@ -857,30 +861,30 @@ function AuthorProfilePage() {
         </p>
       </div>
 
-      <ProfileHeader profile={profile} completeness={completeness} />
+      <ProfileHeader profile={profile} completeness={completeness} onEdit={() => setEditMode(true)} />
 
-      {completenessError && (
-        <div className="mb-8 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
-          <p>Unable to load profile completeness: {completenessError}</p>
-        </div>
-      )}
-
-      <ActionRequired actionItems={actionItems} onAcceptInvitation={handleAcceptInvitation} />
-
-      {actionItemsError && (
-        <div className="mb-8 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
-          <p>Unable to load action items: {actionItemsError}</p>
-        </div>
-      )}
-      
       {editMode ? (
         <ProfileEditForm 
           profile={profile} 
           onSave={handleProfileSave}
-          onCancel={() => setEditMode(false)}
+          onCancel={handleProfileCancel}
         />
       ) : (
         <>
+          {completenessError && (
+            <div className="mb-8 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
+              <p>Unable to load profile completeness: {completenessError}</p>
+            </div>
+          )}
+
+          <ActionRequired actionItems={actionItems} onAcceptInvitation={handleAcceptInvitation} />
+
+          {actionItemsError && (
+            <div className="mb-8 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
+              <p>Unable to load action items: {actionItemsError}</p>
+            </div>
+          )}
+          
           {manuscriptError ? (
             <div className="mb-8 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
               <p>Unable to load manuscript workspace: {manuscriptError}</p>
@@ -888,15 +892,15 @@ function AuthorProfilePage() {
           ) : (
             <ManuscriptWorkspace manuscriptSummary={manuscriptSummary} />
           )}
+          
+          {publicationsError ? (
+            <div className="mb-8 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
+              <p>Unable to load publications: {publicationsError}</p>
+            </div>
+          ) : (
+            <Publications publications={publications} />
+          )}
         </>
-      )}
-      
-      {publicationsError ? (
-        <div className="mb-8 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
-          <p>Unable to load publications: {publicationsError}</p>
-        </div>
-      ) : (
-        <Publications publications={publications} />
       )}
     </div>
   )
