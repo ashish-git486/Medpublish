@@ -190,7 +190,7 @@ export async function getCoAuthorManuscripts() {
     `)
     .eq('profile_id', user.id)
     .eq('invitation_status', 'accepted')
-    .order('updated_at', { ascending: false })
+    .order('manuscripts', { updated_at: { ascending: false } })
 
   if (error) {
     console.error('MedPublish: failed to get co-author manuscripts', error)
@@ -370,7 +370,7 @@ export async function getMyPublications() {
     .eq('profile_id', user.id)
     .eq('invitation_status', 'accepted')
     .eq('manuscripts.status', 'published')
-    .order('manuscripts.reviewed_at', { ascending: false })
+    .order('manuscripts', { reviewed_at: { ascending: false } })
 
   if (coAuthorError) {
     console.error('MedPublish: failed to get my publications (co-author)', coAuthorError)

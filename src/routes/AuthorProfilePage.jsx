@@ -416,6 +416,10 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
 // =========================================================================
 
 function ActionRequired({ actionItems, onAcceptInvitation }) {
+  if (!actionItems) {
+    return null
+  }
+
   const hasActions =
     (actionItems?.revision_requests?.length > 0) ||
     (actionItems?.proof_reviews?.length > 0) ||
@@ -517,6 +521,17 @@ function ActionRequired({ actionItems, onAcceptInvitation }) {
 
 function ManuscriptWorkspace({ manuscriptSummary }) {
   const [filter, setFilter] = useState('all')
+
+  if (!manuscriptSummary) {
+    return (
+      <div className="mb-8 rounded-xl border border-slate-200 bg-white p-6">
+        <h2 className="font-serif text-xl font-semibold text-ink mb-4">My Manuscripts</h2>
+        <div className="text-center py-8">
+          <p className="text-slate-500">Loading manuscript workspace…</p>
+        </div>
+      </div>
+    )
+  }
 
   const allManuscripts = [
     ...(manuscriptSummary?.submitting_author_manuscripts || []).map(m => ({
@@ -641,6 +656,15 @@ function ManuscriptWorkspace({ manuscriptSummary }) {
 // =========================================================================
 
 function Publications({ publications }) {
+  if (publications === null) {
+    return (
+      <div className="mb-8 rounded-xl border border-slate-200 bg-white p-6">
+        <h2 className="font-serif text-xl font-semibold text-ink mb-4">My Publications</h2>
+        <p className="text-slate-500">Loading publications…</p>
+      </div>
+    )
+  }
+
   if (!publications || publications.length === 0) {
     return (
       <div className="mb-8 rounded-xl border border-slate-200 bg-white p-6">
@@ -716,6 +740,10 @@ function AuthorProfilePage() {
   const [loading, setLoading] = useState(true)
   const [editMode, setEditMode] = useState(false)
   const [error, setError] = useState(null)
+  const [completenessError, setCompletenessError] = useState(null)
+  const [manuscriptError, setManuscriptError] = useState(null)
+  const [actionItemsError, setActionItemsError] = useState(null)
+  const [publicationsError, setPublicationsError] = useState(null)
 
   useEffect(() => {
     if (!isAuthenticated) return
@@ -725,25 +753,46 @@ function AuthorProfilePage() {
       setError(null)
 
       try {
-        const [profileResult, completenessResult, manuscriptResult, actionResult, publicationsResult] = await Promise.all([
-          getMyProfile(),
-          getProfileCompleteness(),
-          getAuthorManuscriptSummary(),
-          getAuthorActionItems(),
-          getMyPublications()
-        ])
-
+        // Load profile data with graceful error handling for each section
+        const profileResult = await getMyProfile()
         if (profileResult.error) throw profileResult.error
-        if (completenessResult.error) throw completenessResult.error
-        if (manuscriptResult.error) throw manuscriptResult.error
-        if (actionResult.error) throw actionResult.error
-        if (publicationsResult.error) throw publicationsResult.error
-
         setProfile(formatProfileForDisplay(profileResult.data))
-        setCompleteness(completenessResult.data)
-        setManuscriptSummary(manuscriptResult.data)
-        setActionItems(actionResult.data)
-        setPublications(publicationsResult.data)
+
+        // Load completeness - non-critical, don't fail entire page if this fails
+        const completenessResult = await getProfileCompleteness()
+        if (!completenessResult.error) {
+          setCompleteness(completenessResult.data)
+        } else {
+          console.warn('MedPublish: failed to load profile completeness', completenessResult.error)
+          setCompletenessError(completenessResult.error.message)
+        }
+
+        // Load manuscript summary - important but don't fail entire page
+        const manuscriptResult = await getAuthorManuscriptSummary()
+        if (!manuscriptResult.error) {
+          setManuscriptSummary(manuscriptResult.data)
+        } else {
+          console.warn('MedPublish: failed to load manuscript summary', manuscriptResult.error)
+          setManuscriptError(manuscriptResult.error.message)
+        }
+
+        // Load action items - non-critical
+        const actionResult = await getAuthorActionItems()
+        if (!actionResult.error) {
+          setActionItems(actionResult.data)
+        } else {
+          console.warn('MedPublish: failed to load action items', actionResult.error)
+          setActionItemsError(actionResult.error.message)
+        }
+
+        // Load publications - non-critical
+        const publicationsResult = await getMyPublications()
+        if (!publicationsResult.error) {
+          setPublications(publicationsResult.data)
+        } else {
+          console.warn('MedPublish: failed to load publications', publicationsResult.error)
+          setPublicationsError(publicationsResult.error.message)
+        }
       } catch (err) {
         console.error('MedPublish: failed to load author profile data', err)
         setError(err.message)
@@ -810,7 +859,19 @@ function AuthorProfilePage() {
 
       <ProfileHeader profile={profile} completeness={completeness} />
 
+      {completenessError && (
+        <div className="mb-8 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
+          <p>Unable to load profile completeness: {completenessError}</p>
+        </div>
+      )}
+
       <ActionRequired actionItems={actionItems} onAcceptInvitation={handleAcceptInvitation} />
+
+      {actionItemsError && (
+        <div className="mb-8 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
+          <p>Unable to load action items: {actionItemsError}</p>
+        </div>
+      )}
       
       {editMode ? (
         <ProfileEditForm 
@@ -819,10 +880,24 @@ function AuthorProfilePage() {
           onCancel={() => setEditMode(false)}
         />
       ) : (
-        <ManuscriptWorkspace manuscriptSummary={manuscriptSummary} />
+        <>
+          {manuscriptError ? (
+            <div className="mb-8 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
+              <p>Unable to load manuscript workspace: {manuscriptError}</p>
+            </div>
+          ) : (
+            <ManuscriptWorkspace manuscriptSummary={manuscriptSummary} />
+          )}
+        </>
       )}
       
-      <Publications publications={publications} />
+      {publicationsError ? (
+        <div className="mb-8 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
+          <p>Unable to load publications: {publicationsError}</p>
+        </div>
+      ) : (
+        <Publications publications={publications} />
+      )}
     </div>
   )
 }
