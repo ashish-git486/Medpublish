@@ -47,25 +47,61 @@ export async function updateMyProfile(profileData) {
     return { data: null, error: new Error('User not authenticated') }
   }
 
-  const { data, error } = await supabase
+  // First check if profile exists
+  const { data: existingProfile } = await supabase
     .from('profiles')
-    .update({
-      full_name: profileData.fullName,
-      phone: profileData.phone || null,
-      country: profileData.country || null,
-      city: profileData.city || null,
-      postal_address: profileData.postalAddress || null,
-      designation: profileData.designation || null,
-      department: profileData.department || null,
-      institution: profileData.institution || null,
-      orcid: profileData.orcid || null,
-      bio: profileData.bio || null,
-      website_url: profileData.websiteUrl || null,
-      avatar_url: profileData.avatarUrl || null,
-    })
+    .select('id')
     .eq('id', user.id)
-    .select()
-    .single()
+    .maybeSingle()
+
+  let result
+
+  if (existingProfile) {
+    // Update existing profile
+    result = await supabase
+      .from('profiles')
+      .update({
+        full_name: profileData.fullName,
+        phone: profileData.phone || null,
+        country: profileData.country || null,
+        city: profileData.city || null,
+        postal_address: profileData.postalAddress || null,
+        designation: profileData.designation || null,
+        department: profileData.department || null,
+        institution: profileData.institution || null,
+        orcid: profileData.orcid || null,
+        bio: profileData.bio || null,
+        website_url: profileData.websiteUrl || null,
+        avatar_url: profileData.avatarUrl || null,
+      })
+      .eq('id', user.id)
+      .select()
+      .single()
+  } else {
+    // Create new profile if it doesn't exist
+    result = await supabase
+      .from('profiles')
+      .insert({
+        id: user.id,
+        full_name: profileData.fullName,
+        email: user.email,
+        phone: profileData.phone || null,
+        country: profileData.country || null,
+        city: profileData.city || null,
+        postal_address: profileData.postalAddress || null,
+        designation: profileData.designation || null,
+        department: profileData.department || null,
+        institution: profileData.institution || null,
+        orcid: profileData.orcid || null,
+        bio: profileData.bio || null,
+        website_url: profileData.websiteUrl || null,
+        avatar_url: profileData.avatarUrl || null,
+      })
+      .select()
+      .single()
+  }
+
+  const { data, error } = result
 
   if (error) {
     console.error('MedPublish: failed to update profile', error)
